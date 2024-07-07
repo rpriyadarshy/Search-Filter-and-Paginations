@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    
+</body>
+<script>
+
+    // #Question-01
+
+    // backend.js
+const express = require('express');
+const cors = require('cors');
+const fs = require('fs');
+
+const app = express();
+const port = 3000; // Choose a port for the server
+
+app.use(cors());
+app.use(express.json());
+
+// Load user data from the JSON file
+let users = JSON.parse(fs.readFileSync('db.json', 'utf8')).users;
+
+// Define a route to handle login requests
+app.post('/login', (req, res) => {
+  const { username, password } = req.body;
+
+  // Find the user in the users array
+  const user = users.find(user => user.username === username && user.password === password);
+
+  if (user) {
+    // Authentication successful, send a success response
+    res.status(200).json({ message: 'Login successful!' });
+  } else {
+    // Authentication failed, send an error response
+    res.status(401).json({ message: 'Invalid credentials. Please try again.' });
+  }
+});
+
+// Start the server
+app.listen(port, () => {
+  console.log(`Server listening on port ${port}`);
+});
+
+// frontend.js
+const form = document.querySelector('form');
+const result = document.getElementById('result');
+
+form.addEventListener('submit', async (event) => {
+  event.preventDefault();
+
+  const username = document.getElementById('username').value;
+  const password = document.getElementById('password').value;
+
+  try {
+    const response = await fetch('/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ username, password })
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      result.textContent = data.message;
+    } else {
+      const errorData = await response.json();
+      result.textContent = errorData.message;
+    }
+  } catch (error) {
+    result.textContent = 'An error occurred. Please try again later.';
+  }
+});
+
+
+
+
+    // #Question-02
+
+
+    // main.js
+const loginForm = document.getElementById('loginForm');
+const welcomeMessage = document.getElementById('welcomeMessage');
+const fetchTodosButton = document.getElementById('fetchTodosButton');
+const todosContainer = document.getElementById('todosContainer');
+
+const BASE_URL = 'https://json-with-auth.onrender.com';
+
+// User Authentication
+loginForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+
+  const username = document.getElementById('username').value;
+  const password = document.getElementById('password').value;
+
+  try {
+    const response = await fetch(`${BASE_URL}/user/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      localStorage.setItem('localAccessToken', data.accessToken);
+      localStorage.setItem('userId', data.userId);
+
+      // Display welcome message
+      welcomeMessage.textContent = `Hey ${username}, welcome back!`;
+      welcomeMessage.style.display = 'block';
+
+      loginForm.style.display = 'none';
+    } else {
+      // Handle error
+      console.error('Login failed.');
+    }
+  } catch (error) {
+    console.error('Error during login:', error);
+  }
+});
+
+// Fetch Todos
+fetchTodosButton.addEventListener('click', async () => {
+  const userId = localStorage.getItem('userId');
+
+  try {
+    const response = await fetch(`${BASE_URL}/todos?userId=${userId}`);
+    const todos = await response.json();
+
+    // Display Todos
+    todosContainer.innerHTML = ''; // Clear previous todos
+    todos.forEach((todo) => {
+      const todoItem = document.createElement('div');
+      todoItem.classList.add('todo-item');
+      todoItem.innerHTML = `
+        <input type="checkbox" id="todo-${todo.id}" data-todo-id="${todo.id}" ${todo.completed ? 'checked' : ''}>
+        <label for="todo-${todo.id}">${todo.task}</label>
+      `;
+
+      // Toggle Todo Completion
+      const checkbox = todoItem.querySelector('input[type="checkbox"]');
+      checkbox.addEventListener('change', async () => {
+        try {
+          const response = await fetch(`${BASE_URL}/todos/${todo.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('localAccessToken')}` },
+            body: JSON.stringify({ completed: checkbox.checked }),
+          });
+
+          if (!response.ok) {
+            // Handle error
+            console.error('Error updating todo completion status.');
+          }
+        } catch (error) {
+          console.error('Error during todo update:', error);
+        }
+      });
+
+      todosContainer.appendChild(todoItem);
+    });
+  } catch (error) {
+    console.error('Error fetching todos:', error);
+  }
+});
+
+// Initial Check for Authentication
+const accessToken = localStorage.getItem('localAccessToken');
+if (accessToken) {
+  // User is already authenticated, show welcome message
+  const username = localStorage.getItem('username');
+  welcomeMessage.textContent = `Hey ${username}, welcome back!`;
+  welcomeMessage.style.display = 'block';
+  loginForm.style.display = 'none';
+} else {
+  // User is not authenticated, show login form
+  loginForm.style.display = 'block';
+  welcomeMessage.style.display = 'none';
+}
+
+
+
+
+    // #Question-03
+
+
+
+    // 1. Get API Key
+const API_KEY = "YOUR_API_KEY"; // Replace with your actual API key
+
+// 2. Create search form
+const searchForm = document.createElement("form");
+searchForm.id = "movieSearchForm";
+const searchInput = document.createElement("input");
+searchInput.type = "text";
+searchInput.placeholder = "Enter movie title";
+searchInput.id = "movieTitle";
+searchForm.appendChild(searchInput);
+const searchButton = document.createElement("button");
+searchButton.type = "submit";
+searchButton.textContent = "Search";
+searchForm.appendChild(searchButton);
+document.body.appendChild(searchForm);
+
+// 3. Handle form submission and fetch data
+searchForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const movieTitle = searchInput.value;
+  fetchMovieData(movieTitle);
+});
+
+// 4. Fetch movie data from OMDB API
+async function fetchMovieData(movieTitle) {
+  try {
+    const response = await fetch(`https://www.omdbapi.com/?apikey=${API_KEY}&s=${movieTitle}`);
+    if (!response.ok) {
+      throw new Error("Network response was not ok");
+    }
+    const data = await response.json();
+    if (data.Response === "False") {
+      throw new Error(data.Error);
+    }
+    displaySearchResults(data);
+  } catch (error) {
+    displayError(error.message);
+  }
+}
+
+// 5. Display search results
+function displaySearchResults(data) {
+  const resultsContainer = document.createElement("div");
+  resultsContainer.id = "searchResults";
+  data.Search.forEach((movie) => {
+    const movieElement = document.createElement("div");
+    movieElement.innerHTML = `
+      <h3>${movie.Title}</h3>
+      <p>Year: ${movie.Year}</p>
+      <p>Type: ${movie.Type}</p>
+      <img src="${movie.Poster}" alt="${movie.Title} poster">
+    `;
+    resultsContainer.appendChild(movieElement);
+  });
+  document.body.appendChild(resultsContainer);
+  // Implement pagination here (e.g., using page numbers, next/previous buttons)
+}
+
+// 6. Display error messages
+function displayError(message) {
+  const errorElement = document.createElement("div");
+  errorElement.textContent = message;
+  errorElement.style.color = "red";
+  document.body.appendChild(errorElement);
+}
+
+// Example of pagination implementation
+function displayPagination(totalPages) {
+  const paginationContainer = document.createElement("div");
+  paginationContainer.id = "pagination";
+  for (let i = 1; i <= totalPages; i++) {
+    const pageButton = document.createElement("button");
+    pageButton.textContent = i;
+    pageButton.addEventListener("click", () => {
+      // Fetch and display data for the corresponding page
+      // ...
+    });
+    paginationContainer.appendChild(pageButton);
+  }
+  document.body.appendChild(paginationContainer);
+}
+
+
+
+
+    // #Question-04
+
+
+
+    const express = require('express');
+const cors = require('cors');
+const fs = require('fs');
+
+const app = express();
+const port = 3000;
+
+app.use(cors());
+app.use(express.json());
+
+// Load task tickets from JSON file
+let tickets = [];
+try {
+  const data = fs.readFileSync('db.json', 'utf8');
+  tickets = JSON.parse(data).tickets;
+} catch (err) {
+  console.error("Error reading or parsing JSON file:", err);
+}
+
+// GET all tickets
+app.get('/tickets', (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+
+  const startIndex = (page - 1) * limit;
+  const endIndex = page * limit;
+
+  const result = tickets.slice(startIndex, endIndex);
+
+  res.json({
+    tickets: result,
+    currentPage: page,
+    totalPages: Math.ceil(tickets.length / limit),
+  });
+});
+
+// GET ticket by ID
+app.get('/tickets/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+  const ticket = tickets.find(t => t.id === id);
+
+  if (ticket) {
+    res.json(ticket);
+  } else {
+    res.status(404).json({ message: 'Ticket not found' });
+  }
+});
+
+// POST new ticket
+app.post('/tickets', (req, res) => {
+  const newTicket = req.body;
+  newTicket.id = tickets.length + 1;
+  tickets.push(newTicket);
+  fs.writeFileSync('db.json', JSON.stringify({ tickets }), 'utf8');
+  res.status(201).json(newTicket);
+});
+
+// PUT update ticket
+app.put('/tickets/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+  const updatedTicket = req.body;
+
+  const index = tickets.findIndex(t => t.id === id);
+
+  if (index !== -1) {
+    tickets[index] = updatedTicket;
+    fs.writeFileSync('db.json', JSON.stringify({ tickets }), 'utf8');
+    res.json(updatedTicket);
+  } else {
+    res.status(404).json({ message: 'Ticket not found' });
+  }
+});
+
+// DELETE ticket
+app.delete('/tickets/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+
+  const index = tickets.findIndex(t => t.id === id);
+
+  if (index !== -1) {
+    tickets.splice(index, 1);
+    fs.writeFileSync('db.json', JSON.stringify({ tickets }), 'utf8');
+    res.json({ message: 'Ticket deleted' });
+  } else {
+    res.status(404).json({ message: 'Ticket not found' });
+  }
+});
+
+// Start the server
+app.listen(port, () => {
+  console.log(`Server listening at http://localhost:${port}`);
+});
+
+
+</script>
+</html>
